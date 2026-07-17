@@ -38,7 +38,10 @@ def texto_fuera_de_alcance(texto: str) -> bool:
         "agregados", "retroexcavadora", "excavadora", "grua", "grúa", "mezcladora", "compactadora",
         "cargador", "dumper", "pavimentadora", "motoniveladora", "tractor", "camion", "camión", "maquinaria",
         "pala", "pico", "carretilla", "martillo", "taladro", "sierra", "nivel", "cinta metrica", "cinta métrica",
-        "alicate", "planos", "plano", "covenin", "estructural", "construcción", "construccion", "obra", "render", "modelo 3d"
+        "alicate", "planos", "plano", "covenin", "estructural", "construcción", "construccion", "obra", "render", "modelo 3d",
+        "software de diseño", "software de diseno", "software cad", "cad", "autocad", "revit", "sketchup",
+        "software estructural", "software de ingeniería", "software de ingenieria",
+        "salud ocupacional", "seguridad industrial", "seguridad en obra", "seguridad laboral",
     }
     if _has_any(normalized, exempt_terms):
         return False

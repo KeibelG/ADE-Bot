@@ -100,8 +100,8 @@ class ChatService:
             priorizar = True
 
         buscar_k = self._top_k + 4 if priorizar else self._top_k
-        
-        # Buscamos en Chroma DB de manera segura
+
+        # Buscamos en Chroma DB de manera segura (evita que un fallo de la BD tumbe la conversación)
         try:
             fragmentos = await self._vector_store.buscar(texto, buscar_k, self._threshold)
         except Exception:
@@ -122,11 +122,8 @@ class ChatService:
         else:
             fragmentos = fragmentos[:self._top_k] if fragmentos else []
 
-        # --- CAMBIO CLAVE ---
-        # Si no hay documentos en ChromaDB ni cargados en sesión, NO BLOQUEAMOS. 
-        # Simplemente permitimos que el LLM responda con su conocimiento base de ADE.
-        # Quitamos la validación que retornaba el mensaje "no tengo documentos oficiales..." de manera forzosa.
-
+        # Si no hay documentos en ChromaDB ni cargados en sesión, no bloqueamos la conversación:
+        # dejamos que el LLM responda con su conocimiento general de ADE (ver _construir_prompt).
         prompt = self._construir_prompt(texto, fragmentos, contexto_validado, es_revisor=es_multimodal)
         client_to_use = self._multimodal_llm if es_multimodal else self._llm
 
@@ -156,9 +153,17 @@ class ChatService:
             partes.append("Documentos oficiales del área (ChromaDB):\n" + "\n\n".join(fragmentos))
         if contexto_extra:
             partes.append("Documentos ADE cargados en la sesión:\n" + contexto_extra)
-        
-        contexto = "\n\n---\n\n".join(partes) if partes else "No hay documentos adicionales adjuntos para esta consulta. Responde utilizando tu conocimiento general de ingeniería en diseño, administración e ingeniería civil de manera profesional."
-        
+
+        contexto = (
+            "\n\n---\n\n".join(partes)
+            if partes
+            else (
+                "No hay documentos adicionales adjuntos para esta consulta. Responde "
+                "utilizando tu conocimiento general de ingeniería en diseño, administración "
+                "e ingeniería civil de manera profesional."
+            )
+        )
+
         sys_prompt = _REVISOR_PLANOS_SYSTEM_PROMPT if es_revisor else _SYSTEM_PROMPT
         return (
             f"{sys_prompt}\n\n"

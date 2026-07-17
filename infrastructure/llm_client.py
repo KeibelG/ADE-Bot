@@ -10,6 +10,8 @@ from langchain_openai import ChatOpenAI
 import asyncio
 
 
+from typing import Any
+
 class LLMClient(ABC):
     @abstractmethod
     async def generar(self, prompt: str, media_files: list[dict[str, str]] | None = None) -> str:

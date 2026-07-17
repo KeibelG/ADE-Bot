@@ -30,6 +30,7 @@ class SQLiteLogRepository(LogRepository):
 
     def _crear_tabla(self) -> None:
         with sqlite3.connect(self._path) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS logs (
                     id        INTEGER PRIMARY KEY AUTOINCREMENT,

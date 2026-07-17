@@ -1,3 +1,4 @@
+import hashlib
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -63,7 +64,7 @@ def _crear_llm_client() -> GeminiLLMClient | GroqLLMClient | OpenRouterLLMClient
 async def lifespan(app: FastAPI):
     global _chat_service, _session_store
     _session_store = SessionDocumentStore()
-    
+
     llm_default = _crear_llm_client()
     multimodal_llm = None
     if isinstance(llm_default, GroqLLMClient):
@@ -71,7 +72,7 @@ async def lifespan(app: FastAPI):
             api_key=os.getenv("GEMINI_API_KEY"),
             model=os.getenv("GEMINI_MODEL", "gemini-2.5-pro"),
         )
-    
+
     _chat_service = ChatService(
         vector_store=ChromaVectorStore(
             path=os.getenv("CHROMA_PATH", "./db/chroma"),
@@ -142,7 +143,11 @@ async def chat(request: MensajeRequest):
 
     contexto_extra = "\n\n---\n\n".join(partes)
 
-    user_id = abs(hash(request.session_id)) % (2 ** 31)
+    MAX_CONTEXTO_SESION_CHARS = int(os.getenv("MAX_CONTEXTO_SESION_CHARS", 12000))
+    if len(contexto_extra) > MAX_CONTEXTO_SESION_CHARS:
+        contexto_extra = contexto_extra[:MAX_CONTEXTO_SESION_CHARS] + "\n[...contexto truncado por límite de tamaño...]"
+
+    user_id = int(hashlib.sha256(request.session_id.encode("utf-8")).hexdigest(), 16) % (2 ** 31)
     respuesta = await _chat_service.procesar_consulta(
         texto=request.mensaje,
         user_id=user_id,
@@ -182,7 +187,7 @@ async def upload(archivo: UploadFile = File(...), session_id: str = Form("anonim
         )
 
     contenido = await archivo.read()
-    
+
     upload_dir = Path("static/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
     filepath = upload_dir / archivo.filename
@@ -195,7 +200,7 @@ async def upload(archivo: UploadFile = File(...), session_id: str = Form("anonim
 
     chunks = [doc.page_content for doc in documentos] if documentos else [f"Archivo de diseño/modelo: {archivo.filename}"]
     await _session_store.add(session_id, archivo.filename, chunks, "pdf", {})
-    
+
     public_url = f"/static/uploads/{archivo.filename}"
     return {
         "archivo": archivo.filename,
@@ -207,7 +212,7 @@ async def upload(archivo: UploadFile = File(...), session_id: str = Form("anonim
 @app.delete("/api/upload")
 async def delete_upload(session_id: str, filename: str):
     await _session_store.remove(session_id, filename)
-    
+
     # También intentar borrar físicamente de static/uploads
     filepath = Path("static/uploads") / filename
     if filepath.exists():
@@ -215,7 +220,7 @@ async def delete_upload(session_id: str, filename: str):
             filepath.unlink()
         except Exception:
             pass
-            
+
     return {"ok": True}
 
 
