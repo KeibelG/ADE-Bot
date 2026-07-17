@@ -42,12 +42,23 @@ class GeminiLLMClient(LLMClient):
                         })
             respuesta = await asyncio.wait_for(
                 self._llm.ainvoke([HumanMessage(content=content_list)]),
-                timeout=25,
+                timeout=60,
             )
-            return str(respuesta.content)
+
+            # gemini-3 devuelve el contenido como una lista de bloques estructurados
+            # (con metadata extra como 'signature'), no como string plano.
+            # Extraemos solo el texto para no mostrar la estructura cruda en el chat.
+            contenido = respuesta.content
+            if isinstance(contenido, list):
+                texto = "".join(
+                    bloque.get("text", "")
+                    for bloque in contenido
+                    if isinstance(bloque, dict) and bloque.get("type") == "text"
+                )
+                return texto
+            return str(contenido)
         except asyncio.TimeoutError as exc:
             raise RuntimeError("LLM request timed out") from exc
-
 
 class GroqLLMClient(LLMClient):
     def __init__(self, api_key: str, model: str):
@@ -75,7 +86,7 @@ class GroqLLMClient(LLMClient):
 
             respuesta = await asyncio.wait_for(
                 self._llm.ainvoke([mensaje]),
-                timeout=20,
+                timeout=60,
             )
             return str(respuesta.content)
         except asyncio.TimeoutError as exc:
@@ -127,7 +138,7 @@ class OpenRouterLLMClient(LLMClient):
             # Enviamos la petición multimodal
             respuesta = await asyncio.wait_for(
                 self._llm.ainvoke([HumanMessage(content=content_list)]),
-                timeout=45,  # Damos un margen de tiempo más amplio por el procesamiento de archivos
+                timeout=80,  # Damos un margen de tiempo más amplio por el procesamiento de archivos
             )
             return str(respuesta.content)
             
