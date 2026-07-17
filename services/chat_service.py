@@ -87,6 +87,7 @@ class ChatService:
                     "al Área de Administración, Diseño e Ingeniería, por lo que fue ignorado."
                 )
 
+        # Si la consulta no es ADE, ni es un saludo/meta, ni tiene archivos multimedia, la rechazamos
         if not consulta_ade and not _es_saludo_o_meta(texto) and not es_multimodal:
             respuesta = REJECT_MESSAGE + advertencia_sesion
             await self._logs.guardar(user_id, texto, respuesta, resuelta=False)
@@ -99,7 +100,12 @@ class ChatService:
             priorizar = True
 
         buscar_k = self._top_k + 4 if priorizar else self._top_k
-        fragmentos = await self._vector_store.buscar(texto, buscar_k, self._threshold)
+        
+        # Buscamos en Chroma DB de manera segura
+        try:
+            fragmentos = await self._vector_store.buscar(texto, buscar_k, self._threshold)
+        except Exception:
+            fragmentos = []
 
         if priorizar and fragmentos:
             def score_fragmento(frag: str) -> int:
@@ -114,16 +120,12 @@ class ChatService:
                 return score
             fragmentos = sorted(fragmentos, key=score_fragmento)[:self._top_k]
         else:
-            fragmentos = fragmentos[:self._top_k]
+            fragmentos = fragmentos[:self._top_k] if fragmentos else []
 
-        if not fragmentos and not contexto_validado and not es_multimodal:
-            respuesta = (
-                "Entiendo tu pregunta dentro del área ADE, pero no tengo documentos oficiales "
-                "del área cargados en este momento. Por favor, carga un documento ADE o usa una "
-                "sesión con fuentes ADE para que pueda responder con información real."
-            )
-            await self._logs.guardar(user_id, texto, respuesta, resuelta=False)
-            return respuesta
+        # --- CAMBIO CLAVE ---
+        # Si no hay documentos en ChromaDB ni cargados en sesión, NO BLOQUEAMOS. 
+        # Simplemente permitimos que el LLM responda con su conocimiento base de ADE.
+        # Quitamos la validación que retornaba el mensaje "no tengo documentos oficiales..." de manera forzosa.
 
         prompt = self._construir_prompt(texto, fragmentos, contexto_validado, es_revisor=es_multimodal)
         client_to_use = self._multimodal_llm if es_multimodal else self._llm
@@ -131,6 +133,7 @@ class ChatService:
         try:
             respuesta = await client_to_use.generar(prompt, media_files=media_files)
         except Exception as exc:
+            print("OCURRIÓ UN ERROR CRÍTICO EN EL LLM:", str(exc))
             respuesta = (
                 "No pude generar la respuesta en este momento. "
                 "Intenta de nuevo más tarde."
@@ -153,7 +156,9 @@ class ChatService:
             partes.append("Documentos oficiales del área (ChromaDB):\n" + "\n\n".join(fragmentos))
         if contexto_extra:
             partes.append("Documentos ADE cargados en la sesión:\n" + contexto_extra)
-        contexto = "\n\n---\n\n".join(partes)
+        
+        contexto = "\n\n---\n\n".join(partes) if partes else "No hay documentos adicionales adjuntos para esta consulta. Responde utilizando tu conocimiento general de ingeniería en diseño, administración e ingeniería civil de manera profesional."
+        
         sys_prompt = _REVISOR_PLANOS_SYSTEM_PROMPT if es_revisor else _SYSTEM_PROMPT
         return (
             f"{sys_prompt}\n\n"

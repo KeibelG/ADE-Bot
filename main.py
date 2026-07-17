@@ -5,12 +5,12 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ingesta.document_loader import cargar_documento_desde_bytes
-from infrastructure.llm_client import GeminiLLMClient, GroqLLMClient
+from infrastructure.llm_client import GeminiLLMClient, GroqLLMClient, OpenRouterLLMClient
 from infrastructure.log_repository import SQLiteLogRepository
 from infrastructure.vector_store import ChromaVectorStore
 from services.chat_service import ChatService
@@ -39,7 +39,14 @@ class MensajeRequest(BaseModel):
     media: list[MediaItem] | None = None
 
 
-def _crear_llm_client() -> GeminiLLMClient | GroqLLMClient:
+def _crear_llm_client() -> GeminiLLMClient | GroqLLMClient | OpenRouterLLMClient:
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if openrouter_key:
+        return OpenRouterLLMClient(
+            api_key=openrouter_key,
+            model=os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash"),
+        )
+
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         return GroqLLMClient(
@@ -48,7 +55,7 @@ def _crear_llm_client() -> GeminiLLMClient | GroqLLMClient:
         )
     return GeminiLLMClient(
         api_key=os.getenv("GEMINI_API_KEY"),
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-pro"),
+        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
     )
 
 
