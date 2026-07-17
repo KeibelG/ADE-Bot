@@ -24,17 +24,30 @@ class GoogleGenAIEmbeddings(Embeddings):
         embeddings: list[list[float]] = []
         for start in range(0, len(texts), self._MAX_BATCH_SIZE):
             batch = texts[start : start + self._MAX_BATCH_SIZE]
-            try:
-                response = self._client.models.embed_content(
-                    model=self._model,
-                    contents=batch,
-                )
-            except ClientError as exc:
-                raise RuntimeError(
-                    f"Error de Google GenAI al generar embeddings con el modelo '{self._model}'. "
-                    "Verifique su clave, cuota y configuración de modelo. "
-                    f"Mensaje original: {exc}"
-                ) from exc
+            max_reintentos = 5
+            espera = 5.0
+            for intento in range(1, max_reintentos + 1):
+                try:
+                    response = self._client.models.embed_content(
+                        model=self._model,
+                        contents=batch,
+                    )
+                    break
+                except ClientError as exc:
+                    es_cuota = getattr(exc, "code", None) == 429 or "429" in str(exc)
+                    if es_cuota and intento < max_reintentos:
+                        print(
+                            f"  Cuota de embeddings alcanzada, reintentando en {espera:.0f}s "
+                            f"(intento {intento}/{max_reintentos})..."
+                        )
+                        time.sleep(espera)
+                        espera *= 2
+                        continue
+                    raise RuntimeError(
+                        f"Error de Google GenAI al generar embeddings con el modelo '{self._model}'. "
+                        "Verifique su clave, cuota y configuración de modelo. "
+                        f"Mensaje original: {exc}"
+                    ) from exc
 
             if not response.embeddings:
                 raise ValueError("No se devolvieron embeddings de Google GenAI en el lote.")

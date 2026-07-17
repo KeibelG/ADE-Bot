@@ -14,3 +14,4 @@ Pillow>=10.0.0
 pytesseract>=0.3.12
 python-dotenv>=1.2.2
 python-multipart>=0.0.32
+aiosqlite>=0.20.0

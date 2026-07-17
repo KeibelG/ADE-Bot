@@ -61,13 +61,20 @@ def ejecutar(docs_path: str | None = None) -> None:
         api_key=api_key,
         model=embedding_model,
     )
-    fragmentos_totales = []
 
+    chroma_path = os.getenv("CHROMA_PATH") or "./db/chroma"
+    reanudar = os.getenv("INGEST_RESUME", "0") == "1"
+    if Path(chroma_path).exists() and not reanudar:
+        shutil.rmtree(chroma_path)
+
+    vector_store = Chroma(persist_directory=chroma_path, embedding_function=embeddings)
+
+    total_fragmentos = 0
     for archivo in archivos:
         print(f"Procesando: {archivo.name}")
         documentos = cargar_documento(archivo)
         if not documentos:
-            print(f"  Saltando {archivo.name}: no se generó contenido." )
+            print(f"  Saltando {archivo.name}: no se generó contenido.")
             continue
 
         etiqueta = _detectar_etiqueta(archivo.stem)
@@ -75,20 +82,21 @@ def ejecutar(docs_path: str | None = None) -> None:
             documento.metadata["tema"] = etiqueta
             documento.metadata["fuente"] = archivo.name
 
-        fragmentos_totales.extend(documentos)
+        try:
+            vector_store.add_documents(documentos)
+        except Exception as exc:
+            print(f"  ERROR indexando {archivo.name}: {exc}")
+            print(
+                "  Los archivos ya procesados antes de este quedaron guardados en ChromaDB. "
+                "Corrige el problema y vuelve a correr con INGEST_RESUME=1 para no repetirlos "
+                "(tendrás que quitar de datos/ los que ya se indexaron, o ajustar manualmente)."
+            )
+            raise
+
+        total_fragmentos += len(documentos)
         print(f"  {len(documentos)} fragmentos generados [{etiqueta}]")
 
-    chroma_path = os.getenv("CHROMA_PATH") or "./db/chroma"
-    if Path(chroma_path).exists():
-        shutil.rmtree(chroma_path)
-
-    Chroma.from_documents(
-        documents=fragmentos_totales,
-        embedding=embeddings,
-        persist_directory=chroma_path,
-    )
-
-    print(f"\nIngesta completada. {len(fragmentos_totales)} fragmentos indexados.")
+    print(f"\nIngesta completada. {total_fragmentos} fragmentos indexados.")
 
 
 if __name__ == "__main__":
