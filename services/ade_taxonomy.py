@@ -64,24 +64,6 @@ ADE_CATEGORIES = {
         "plano", "croquis", "blueprint", "carga estructural", "estructura", "concreto", "acero",
         "material", "obra", "normativa", "norma", "reglamento", "especificación", "especificacion",
         "memoria técnica", "memoria tecnica", "cimentación", "cimentacion", "construcción", "construccion",
-        "arquitectura", "diseño estructural", "diseno estructural", "calculo estructural", "cálculo estructural",
-        "viga", "columna", "covein", "covenin", "norma covenin", "plano arquitectonico", "plano estructural",
-        "secciones", "cortes", "render", "modelo 3d"
-    ),
-    "materiales": (
-        "concreto", "acero", "cemento", "ladrillo", "arena", "grava", "madera", "asfalto", "yeso", 
-        "tuberias", "tuberia", "viga", "bloque", "cabilla", "aditivo", "dosificacion", "dosificación",
-        "agregados", "piedra picada", "materiales de construccion", "materiales de construcción"
-    ),
-    "maquinaria": (
-        "retroexcavadora", "retroexcavadoras", "excavadora", "grua", "grúa", "mezcladora", "compactadora", 
-        "cargador", "dumper", "pavimentadora", "motoniveladora", "tractor", "camion", "camión", "maquinaria",
-        "equipo pesado", "maquinaria de obra"
-    ),
-    "herramientas": (
-        "pala", "pico", "carretilla", "martillo", "destornillador", "taladro", "sierra", "nivel", 
-        "cinta metrica", "cinta métrica", "alicate", "llaves", "herramientas de obra", "herramientas de construccion",
-        "herramientas de construcción"
     ),
     "finance": (
         "presupuesto", "financiero", "finanzas", "estado financiero", "partida", "ejecución presupuestaria",

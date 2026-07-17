@@ -18,7 +18,7 @@ class _FakeLLMClient(LLMClient):
     def __init__(self, respuesta: str):
         self._respuesta = respuesta
 
-    async def generar(self, prompt: str, media_files: list[dict[str, str]] | None = None) -> str:
+    async def generar(self, prompt: str) -> str:
         return self._respuesta
 
 
@@ -33,15 +33,6 @@ class _FakeLogRepository(LogRepository):
             "respuesta": respuesta,
             "resuelta": resuelta,
         })
-
-    async def obtener_metricas(self) -> dict:
-        return {}
-
-    async def obtener_logs_recientes(self, limite: int = 20) -> list[dict]:
-        return []
-
-    async def obtener_topicos_mas_consultados(self) -> list[dict]:
-        return []
 
 
 # (consulta, debe_ser_resuelta)

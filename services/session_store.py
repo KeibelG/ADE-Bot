@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,10 +24,6 @@ class SessionDocumentStore:
     def __init__(self) -> None:
         self._storage_dir = SESSION_STORE_PATH
         self._storage_dir.mkdir(parents=True, exist_ok=True)
-        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-
-    def _lock_for(self, session_id: str) -> asyncio.Lock:
-        return self._locks[session_id]
 
     def _session_file(self, session_id: str) -> Path:
         safe_id = session_id.replace("/", "_").replace("\\", "_")
@@ -70,26 +65,24 @@ class SessionDocumentStore:
         resource_type: str,
         metadata: dict[str, Any],
     ) -> None:
-        async with self._lock_for(session_id):
-            documents = await self._read_session(session_id)
-            documents = [doc for doc in documents if doc.get("filename") != filename]
-            documents.append({
-                "filename": filename,
-                "chunks": chunks,
-                "resource_type": resource_type,
-                "metadata": metadata,
-            })
-            await self._write_session(session_id, documents)
+        documents = await self._read_session(session_id)
+        documents = [doc for doc in documents if doc.get("filename") != filename]
+        documents.append({
+            "filename": filename,
+            "chunks": chunks,
+            "resource_type": resource_type,
+            "metadata": metadata,
+        })
+        await self._write_session(session_id, documents)
 
     async def list(self, session_id: str) -> list[SessionDocument]:
         documents = await self._read_session(session_id)
         return [self._dict_to_document(doc) for doc in documents]
 
     async def remove(self, session_id: str, filename: str) -> None:
-        async with self._lock_for(session_id):
-            documents = await self._read_session(session_id)
-            documents = [doc for doc in documents if doc.get("filename") != filename]
-            await self._write_session(session_id, documents)
+        documents = await self._read_session(session_id)
+        documents = [doc for doc in documents if doc.get("filename") != filename]
+        await self._write_session(session_id, documents)
 
     async def format_context(self, session_id: str) -> str:
         documents = await self.list(session_id)
