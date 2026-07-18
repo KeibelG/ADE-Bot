@@ -1,3 +1,13 @@
+---
+title: ADE-Bot
+emoji: 🏗️
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # ADE-Bot
 
 Chatbot institucional para el Área de Ingeniería en Diseño. Responde consultas sobre pensum, trámites, licitaciones, normativas y finanzas usando recuperación semántica sobre documentos oficiales del área.
