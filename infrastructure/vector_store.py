@@ -1,12 +1,9 @@
-import logging
 import os
 from abc import ABC, abstractmethod
 
 from langchain_chroma import Chroma
 from infrastructure.google_embeddings import GoogleGenAIEmbeddings
 from starlette.concurrency import run_in_threadpool
-
-logger = logging.getLogger(__name__)
 
 
 class VectorStore(ABC):
@@ -29,7 +26,6 @@ class ChromaVectorStore(VectorStore):
                 k=top_k,
             )
         except Exception:
-            logger.exception("Fallo la búsqueda en ChromaDB para la consulta: %r", consulta)
             return []
 
         fragmentos = []

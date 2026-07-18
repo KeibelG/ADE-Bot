@@ -36,18 +36,6 @@ _SYSTEM_PROMPT = (
     "'blueprint' → plano, 'pa pedir un permiso' → procedimiento administrativo."
 )
 
-_REVISOR_PLANOS_SYSTEM_PROMPT = (
-    "Eres Juanito el Inge, asistente técnico experto en revisión de planos del Área de "
-    "Administración, Diseño e Ingeniería (ADE) de la UNEG. "
-    "Tu tono es formal, claro y amable. "
-    "\n\nREGLAS DE REVISIÓN:"
-    "\n1. Analiza con detalle el plano, imagen o PDF técnico adjunto en los archivos multimedia."
-    "\n2. Identifica posibles inconsistencias estructurales, distribución de espacios y problemas constructivos."
-    "\n3. Verifica el cumplimiento de las normativas de construcción aplicables, especialmente las normas COVENIN (como COVENIN 3476-1999 u otras normas técnicas presentes en la carpeta 'datos')."
-    "\n4. Cita cada fuente usada en el formato [Fuente: nombre_archivo.ext]."
-    "\n5. Proporciona recomendaciones técnicas claras, estructuradas y precisas para la mejora del diseño o plano."
-)
-
 
 class ChatService:
     def __init__(
@@ -57,26 +45,22 @@ class ChatService:
         log_repository: LogRepository,
         top_k: int = 4,
         similarity_threshold: float = 0.60,
-        multimodal_llm_client: LLMClient | None = None,
     ):
         self._vector_store = vector_store
         self._llm = llm_client
         self._logs = log_repository
         self._top_k = top_k
         self._threshold = similarity_threshold
-        self._multimodal_llm = multimodal_llm_client or llm_client
 
     async def procesar_consulta(
         self,
         texto: str,
         user_id: int,
         contexto_extra: str = "",
-        media_files: list[dict[str, str]] | None = None,
     ) -> str:
         consulta_ade = texto_es_ade(texto)
         contexto_validado = ""
         advertencia_sesion = ""
-        es_multimodal = bool(media_files)
 
         if contexto_extra:
             if texto_es_ade(contexto_extra):
@@ -93,11 +77,7 @@ class ChatService:
             await self._logs.guardar(user_id, texto, respuesta, resuelta=False)
             return respuesta
 
-        # RAG: Si se detectan entidades de materiales, maquinaria o herramientas, priorizamos fragmentos relacionados
-        priorizar = False
-        terms_priorizar = {"material", "maquinaria", "herramienta", "concreto", "acero", "cemento", "retroexcavadora", "covenin", "norma", "obra"}
-        if any(term in texto.lower() for term in terms_priorizar):
-            priorizar = True
+        fragmentos = await self._vector_store.buscar(texto, self._top_k, self._threshold)
 
         buscar_k = self._top_k + 4 if priorizar else self._top_k
 
@@ -128,7 +108,7 @@ class ChatService:
         client_to_use = self._multimodal_llm if es_multimodal else self._llm
 
         try:
-            respuesta = await client_to_use.generar(prompt, media_files=media_files)
+            respuesta = await self._llm.generar(prompt)
         except Exception as exc:
             print("OCURRIÓ UN ERROR CRÍTICO EN EL LLM:", str(exc))
             respuesta = (
@@ -138,7 +118,7 @@ class ChatService:
             await self._logs.guardar(user_id, texto, str(exc), resuelta=False)
             return respuesta + advertencia_sesion
 
-        await self._logs.guardar(user_id, texto, respuesta, resuelta=bool(fragmentos or contexto_validado or es_multimodal))
+        await self._logs.guardar(user_id, texto, respuesta, resuelta=bool(fragmentos or contexto_validado))
         return respuesta + advertencia_sesion
 
     def _construir_prompt(
@@ -146,7 +126,6 @@ class ChatService:
         consulta: str,
         fragmentos: list[str],
         contexto_extra: str = "",
-        es_revisor: bool = False,
     ) -> str:
         partes: list[str] = []
         if fragmentos:
@@ -166,7 +145,7 @@ class ChatService:
 
         sys_prompt = _REVISOR_PLANOS_SYSTEM_PROMPT if es_revisor else _SYSTEM_PROMPT
         return (
-            f"{sys_prompt}\n\n"
+            f"{_SYSTEM_PROMPT}\n\n"
             f"Contexto:\n{contexto}\n\n"
             f"Pregunta: {consulta}\n"
             f"Respuesta:"

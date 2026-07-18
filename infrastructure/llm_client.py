@@ -10,11 +10,9 @@ from langchain_openai import ChatOpenAI
 import asyncio
 
 
-from typing import Any
-
 class LLMClient(ABC):
     @abstractmethod
-    async def generar(self, prompt: str, media_files: list[dict[str, str]] | None = None) -> str:
+    async def generar(self, prompt: str) -> str:
         pass
 
 
@@ -22,24 +20,8 @@ class GeminiLLMClient(LLMClient):
     def __init__(self, api_key: str, model: str):
         self._llm = ChatGoogleGenerativeAI(model=model, google_api_key=api_key)
 
-    async def generar(self, prompt: str, media_files: list[dict[str, str]] | None = None) -> str:
+    async def generar(self, prompt: str) -> str:
         try:
-            content_list: list[Any] = [{"type": "text", "text": prompt}]
-            if media_files:
-                for media in media_files:
-                    mime = media.get("mime_type", "")
-                    data = media.get("data", "")
-                    if mime.startswith("image/"):
-                        content_list.append({
-                            "type": "image_url",
-                            "image_url": {"url": f"data:{mime};base64,{data}"}
-                        })
-                    elif mime == "application/pdf":
-                        content_list.append({
-                            "type": "media",
-                            "mime_type": "application/pdf",
-                            "data": data
-                        })
             respuesta = await asyncio.wait_for(
                 self._llm.ainvoke([HumanMessage(content=content_list)]),
                 timeout=60,
@@ -64,7 +46,7 @@ class GroqLLMClient(LLMClient):
     def __init__(self, api_key: str, model: str):
         self._llm = ChatGroq(model=model, api_key=api_key)
 
-    async def generar(self, prompt: str, media_files: list[dict[str, str]] | None = None) -> str:
+    async def generar(self, prompt: str) -> str:
         try:
             # Si hay archivos multimedia, estructuramos la petición en formato multimodal
             if media_files:
@@ -88,7 +70,7 @@ class GroqLLMClient(LLMClient):
                 self._llm.ainvoke([mensaje]),
                 timeout=60,
             )
-            return str(respuesta.content)
+            return respuesta.content
         except asyncio.TimeoutError as exc:
             raise RuntimeError("LLM request timed out") from exc
 
